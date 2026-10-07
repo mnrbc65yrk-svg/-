@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Дурак</title>
+<meta name="theme-color" content="#1f6b46">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#1f6b46;--bg2:#17533a;--fg:#fff;--gold:#f2c14e;--goldfg:#2b2100}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#123d2a;--bg2:#0d2c1e}}
+:root[data-theme="dark"]{--bg:#123d2a;--bg2:#0d2c1e}
+[hidden]{display:none!important}
+body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:Georgia,"Times New Roman",serif;overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;position:relative}
+#top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--bg2);min-height:64px}
+#ops{display:flex;flex-wrap:wrap;gap:6px}
+.op{background:#0003;border-radius:8px;padding:5px 9px;font-size:13px;line-height:1.3;border:2px solid transparent}
+.op.a{border-color:var(--gold)}
+.op.d{background:#0006}
+#dk{display:flex;align-items:center;gap:4px;font-size:12px;text-align:right;flex:none}
+#dk .tr{transform:rotate(90deg);width:36px;height:52px;font-size:13px;margin:0 0 0 6px}
+#dk .back{width:36px;height:52px}
+#tb{flex:1;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:6px;padding:10px;overflow-y:auto}
+.pr{position:relative;width:84px;height:108px;cursor:pointer}
+.pr .d{position:absolute;left:16px;top:16px;transform:rotate(9deg)}
+.pr.sel .c:first-child{box-shadow:0 0 0 3px var(--gold)}
+#bar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg2);font-size:14px}
+#st{flex:1}
+button,select{font:700 16px Georgia,serif;border:0;border-radius:10px;padding:10px 16px}
+button{background:var(--gold);color:var(--goldfg);min-width:90px}
+#gear{min-width:0;padding:10px 12px;background:#0004;color:#fff}
+button:disabled{opacity:.35}
+#hand{display:flex;overflow-x:auto;padding:26px 14px 14px 40px;min-height:120px}
+#hand .c{margin-left:-26px}
+.c{width:64px;height:90px;flex:none;background:#fff;border-radius:8px;box-shadow:0 1px 4px #0007;color:#1b1b1b;user-select:none;transition:transform .15s}
+.c svg{width:100%;height:100%;display:block}
+.c.red{color:#c62828}
+.c.back{background:repeating-linear-gradient(45deg,#2b4a9b 0 6px,#1f3a80 6px 12px);border:3px solid #fff}
+.c.ok{transform:translateY(-10px);box-shadow:0 0 0 2px var(--gold),0 3px 8px #0009}
+.c.pick{transform:translateY(-22px);box-shadow:0 0 0 3px var(--gold),0 4px 10px #000a}
+.ov{position:absolute;inset:0;background:#000c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;font-size:22px;padding:20px}
+.ov label{display:flex;justify-content:space-between;align-items:center;gap:16px;width:min(320px,100%);font-size:17px}
+select{background:#fff;color:#1b1b1b;font-size:16px;padding:8px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top"><div id="ops"></div><div id="dk"></div></div>
+  <div id="tb"></div>
+  <div id="bar"><button id="gear" aria-label="Настройки">⚙</button><span id="st"></span><button id="bt"></button></div>
+  <div id="hand"></div>
+  <div id="cf" class="ov">
+    <div>Дурак</div>
+    <label>Игроков<select id="np"></select></label>
+    <label>Колода<select id="sz"><option value="24">24 карты</option><option value="36" selected>36 карт</option><option value="52">52 карты</option></select></label>
+    <label>Правила<select id="md"><option value="0">Подкидной</option><option value="1">Переводной</option></select></label>
+    <label>Подкидывают<select id="th"><option value="0">Соседи</option><option value="1">Все</option></select></label>
+    <button id="go">Играть</button>
+  </div>
+  <div id="ov" class="ov" hidden><div id="ovt"></div><button id="again">Ещё раз</button><button id="cfg">Настройки</button></div>
+</div>
+<script>
+/* Рисование карт: числа — «точки» как на настоящих картах, В/Д/К — портреты, Т — большая масть */
+(function () {
+var SUIT = ['♠', '♣', '♥', '♦'];
+var LABEL = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
+var L = [.3, .7], M = .5;
+var PIPS = {
+  2: [[M, .2], [M, .8]],
+  3: [[M, .2], [M, .5], [M, .8]],
+  4: [[L[0], .2], [L[1], .2], [L[0], .8], [L[1], .8]],
+  5: [[L[0], .2], [L[1], .2], [M, .5], [L[0], .8], [L[1], .8]],
+  6: [[L[0], .2], [L[1], .2], [L[0], .5], [L[1], .5], [L[0], .8], [L[1], .8]],
+  7: [[L[0], .2], [L[1], .2], [M, .35], [L[0], .5], [L[1], .5], [L[0], .8], [L[1], .8]],
+  8: [[L[0], .2], [L[1], .2], [M, .35], [L[0], .5], [L[1], .5], [M, .65], [L[0], .8], [L[1], .8]],
+  9: [[L[0], .18], [L[1], .18], [L[0], .39], [L[1], .39], [M, .5], [L[0], .61], [L[1], .61], [L[0], .82], [L[1], .82]],
+  10: [[L[0], .18], [L[1], .18], [M, .285], [L[0], .39], [L[1], .39], [L[0], .61], [L[1], .61], [M, .715], [L[0], .82], [L[1], .82]]
+};
+
+/* Половина портрета (верхняя), нижняя получается поворотом на 180° */
+function figure(rank) {
+  var skin = '#f4d3a8', gold = '#f2c14e', dark = '#3a2a1a';
+  var g = '';
+  if (rank === 10) g += '<path d="M38 41Q37 27 50 27Q63 27 62 41L65 58L57 51H43L35 58Z" fill="#b8741a" stroke="' + dark + '" stroke-width=".8"/>';
+  g += '<path d="M25 70Q27 52 50 51Q73 52 75 70Z" fill="currentColor" stroke="' + gold + '" stroke-width="1.4"/>';
+  g += '<path d="M44 51L50 60L56 51" fill="none" stroke="' + gold + '" stroke-width="1.4"/>';
+  g += '<circle cx="50" cy="41" r="9" fill="' + skin + '" stroke="' + dark + '" stroke-width=".8"/>';
+  g += '<circle cx="46.5" cy="40" r="1.1" fill="' + dark + '"/><circle cx="53.5" cy="40" r="1.1" fill="' + dark + '"/>';
+  g += '<path d="M47 45Q50 47 53 45" fill="none" stroke="#a33" stroke-width="1"/>';
+  if (rank === 11) {
+    g += '<path d="M42 44Q50 58 58 44Q50 50 42 44Z" fill="#7a4b1e"/>';
+    g += '<path d="M39 34L40.5 24L45.5 29L50 22L54.5 29L59.5 24L61 34Z" fill="' + gold + '" stroke="#8a6b00" stroke-width=".9"/>';
+    g += '<circle cx="50" cy="28" r="1.5" fill="#d33"/>';
+  } else if (rank === 10) {
+    g += '<path d="M41 33L50 25L59 33Z" fill="' + gold + '" stroke="#8a6b00" stroke-width=".9"/>';
+    g += '<circle cx="50" cy="30" r="1.8" fill="#d33"/>';
+    g += '<path d="M42 56Q50 62 58 56" fill="none" stroke="' + gold + '" stroke-width="1.3"/>';
+  } else {
+    g += '<path d="M39 38Q39 26 50 26Q61 26 61 38Q50 33 39 38Z" fill="currentColor" stroke="' + dark + '" stroke-width=".8"/>';
+    g += '<path d="M58 29Q72 18 74 31Q66 27 60 34Z" fill="' + gold + '" stroke="#8a6b00" stroke-width=".8"/>';
+    g += '<path d="M38 38L37 47L41 43Z" fill="#6b3e12"/>';
+  }
+  return g;
+}
+
+function corner(label, suit) {
+  var t = '<text x="11" y="20" text-anchor="middle" font-size="' + (label.length > 1 ? 14 : 17) + '" font-weight="700" font-family="Georgia,serif" fill="currentColor">' + label + '</text>' +
+          '<text x="11" y="36" text-anchor="middle" font-size="15" fill="currentColor">' + suit + '</text>';
+  return t + '<g transform="rotate(180 50 70)">' + t + '</g>';
+}
+
+window.drawCard = function (c, extra) {
+  var label = LABEL[c.r], suit = SUIT[c.s], r = c.r;
+  var body = '';
+  if (r <= 8) {
+    PIPS[r + 2].forEach(function (p) {
+      var x = 22 + p[0] * 56, y = 20 + p[1] * 100;
+      body += '<text x="' + x + '" y="' + y + '" text-anchor="middle" dominant-baseline="central" font-size="24" fill="currentColor"' +
+        (p[1] > .5 ? ' transform="rotate(180 ' + x + ' ' + y + ')"' : '') + '>' + suit + '</text>';
+    });
+  } else if (r === 12) {
+    body = '<text x="50" y="70" text-anchor="middle" dominant-baseline="central" font-size="58" fill="currentColor">' + suit + '</text>';
+  } else {
+    var f = figure(r);
+    body = '<rect x="22" y="18" width="56" height="104" rx="3" fill="#fff6dc" stroke="currentColor" stroke-width="1.2"/>' +
+      '<g>' + f + '</g><g transform="rotate(180 50 70)">' + f + '</g>' +
+      '<line x1="22" y1="70" x2="78" y2="70" stroke="currentColor" stroke-width=".8"/>';
+  }
+  return '<div class="c ' + (c.s > 1 ? 'red' : '') + ' ' + (extra || '') + '"><svg viewBox="0 0 100 140" aria-label="' + label + suit + '">' +
+    corner(label, suit) + body + '</svg></div>';
+};
+})();
+</script>
+<script>
+(function () {
+'use strict';
+
+/* Показываем любую ошибку прямо на экране */
+function showError(text) {
+  var d = document.getElementById('errbar');
+  if (!d) {
+    d = document.createElement('div');
+    d.id = 'errbar';
+    d.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99;background:#b71c1c;color:#fff;font:13px monospace;padding:8px;white-space:pre-wrap';
+    document.body.appendChild(d);
+  }
+  d.textContent = 'Ошибка: ' + text;
+}
+window.addEventListener('error', function (e) {
+  showError(e.message + ' (строка ' + e.lineno + ')');
+});
+
+var SUITS = ['♠', '♣', '♥', '♦'];
+var RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
+
+var settings = { n: 2, size: 36, perevod: false, all: false };
+var deck, trump, hands, table, att, dfn, taking, lim, over, passed, sel, tgt, out, msg, wait;
+var timer = null;
+
+function $(id) { return document.getElementById(id); }
+function name(i) { return i ? 'Бот ' + i : 'Вы'; }
+
+/* Следующий игрок, у которого есть карты */
+function next(i) {
+  for (var k = 1; k <= settings.n; k++) {
+    var j = (i + k) % settings.n;
+    if (hands[j].length) return j;
+  }
+  return i;
+}
+function undefIdx() {
+  for (var i = 0; i < table.length; i++) if (!table[i].d) return i;
+  return -1;
+}
+function allDefended() { return table.length > 0 && undefIdx() < 0; }
+function beats(d, a) {
+  return (d.s === a.s && d.r > a.r) || (d.s === trump.s && a.s !== trump.s);
+}
+function val(c) { return c.r + (c.s === trump.s ? 20 : 0); }
+function tableRanks() {
+  var r = {};
+  table.forEach(function (t) { r[t.a.r] = 1; if (t.d) r[t.d.r] = 1; });
+  return r;
+}
+function validThrow(cs) {
+  if (!cs.length || table.length + cs.length > lim) return false;
+  if (!table.length) return cs.every(function (c) { return c.r === cs[0].r; });
+  var r = tableRanks();
+  return cs.every(function (c) { return r[c.r]; });
+}
+function removeCard(i, c) {
+  var k = hands[i].indexOf(c);
+  if (k >= 0) hands[i].splice(k, 1);
+}
+function cardHTML(c, extra) {
+  return window.drawCard(c, extra);
+}
+
+/* Единственный таймер хода: два тика одновременно невозможны */
+function sched(ms) {
+  clearTimeout(timer);
+  timer = setTimeout(tick, ms);
+}
+function runNow() {
+  clearTimeout(timer);
+  tick();
+}
+
+/* Кто может подкидывать */
+function throwers() {
+  var a = [att];
+  var k, j;
+  if (settings.all) {
+    for (k = 1; k < settings.n; k++) {
+      j = (att + k) % settings.n;
+      if (j !== dfn) a.push(j);
+    }
+  } else {
+    var s = next(dfn);
+    if (s !== att && s !== dfn) a.push(s);
+  }
+  return a.filter(function (i) { return hands[i].length; });
+}
+
+/* Карты, которыми можно перевести */
+function xferable(i) {
+  if (!settings.perevod || !table.length) return [];
+  if (table.some(function (t) { return t.d || t.a.r !== table[0].a.r; })) return [];
+  var n = next(i);
+  if (n === i || hands[n].length < table.length + 1) return [];
+  return hands[i].filter(function (c) { return c.r === table[0].a.r; });
+}
+function doXfer(i, c) {
+  removeCard(i, c);
+  table.push({ a: c });
+  att = i;
+  dfn = next(i);
+  passed = {};
+  lim = Math.min(6, hands[dfn].length);
+  wait = false;
+  render();
+  sched(800);
+}
+
+function startGame() {
+  clearTimeout(timer);
+  deck = [];
+  for (var s = 0; s < 4; s++)
+    for (var r = 13 - settings.size / 4; r < 13; r++) deck.push({ s: s, r: r });
+  for (var i = deck.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = deck[i]; deck[i] = deck[j]; deck[j] = t;
+  }
+  trump = deck[0];
+  hands = [];
+  for (var p = 0; p < settings.n; p++) hands.push(deck.splice(deck.length - 6, 6));
+  var best = 99;
+  att = 0;
+  hands.forEach(function (h, idx) {
+    h.forEach(function (c) {
+      if (c.s === trump.s && c.r < best) { best = c.r; att = idx; }
+    });
+  });
+  table = []; out = []; over = false; msg = '';
+  newRound();
+}
+
+function newRound() {
+  taking = false; passed = {}; sel = []; tgt = -1; wait = false;
+  if (!hands[att].length) att = next(att);
+  dfn = next(att);
+  lim = Math.min(6, hands[dfn].length);
+  render();
+  sched(700);
+}
+
+/* Добор: сначала атакующий, защитник последним */
+function refill() {
+  var order = [];
+  for (var k = 0; k < settings.n; k++) order.push((att + k) % settings.n);
+  order.splice(order.indexOf(dfn), 1);
+  order.push(dfn);
+  order.forEach(function (i) {
+    while (hands[i].length < 6 && deck.length) hands[i].push(deck.pop());
+  });
+}
+
+function finish() {
+  var alive = hands.filter(function (h) { return h.length; }).length;
+  if (deck.length || alive > 1) return false;
+  over = true;
+  var loser = -1;
+  hands.forEach(function (h, i) { if (h.length) loser = i; });
+  if (loser < 0) msg = 'Ничья';
+  else if (loser === 0) msg = 'Вы остались в дураках 🤡';
+  else msg = 'Вы не дурак 🎉 Дурак — ' + name(loser);
+  return true;
+}
+
+function endBito() {
+  if (over || !table.length) return;
+  table = [];
+  refill();
+  if (finish()) { render(); return; }
+  att = dfn;
+  newRound();
+}
+function endTake() {
+  if (over || !table.length) return;
+  table.forEach(function (t) {
+    hands[dfn].push(t.a);
+    if (t.d) hands[dfn].push(t.d);
+  });
+  table = [];
+  refill();
+  if (finish()) { render(); return; }
+  att = next(dfn);
+  newRound();
+}
+
+/* Защита бота */
+function botDefend() {
+  var k = undefIdx();
+  var a = table[k].a;
+  var xf = xferable(dfn).sort(function (x, y) { return val(x) - val(y); });
+  if (xf.length && Math.random() < 0.6) { doXfer(dfn, xf[0]); return; }
+  var opts = hands[dfn].filter(function (c) { return beats(c, a); })
+    .sort(function (x, y) { return val(x) - val(y); });
+  if (opts.length) {
+    table[k].d = opts[0];
+    removeCard(dfn, opts[0]);
+  } else {
+    taking = true;
+  }
+  render();
+  sched(700);
+}
+
+/* Подкидывание бота */
+function botThrow(i) {
+  if (lim - table.length <= 0) return null;
+  var opts = hands[i].filter(function (c) { return validThrow([c]); })
+    .sort(function (a, b) { return val(a) - val(b); });
+  if (!opts.length) return null;
+  if (!table.length) {
+    var c = opts.filter(function (x) { return x.s !== trump.s; })[0] || opts[0];
+    var same = hands[i].filter(function (x) { return x.r === c.r && x.s !== trump.s; });
+    if (same.length > 1 && Math.random() < 0.4) return same.slice(0, lim);
+    return [c];
+  }
+  opts = opts.filter(function (x) { return x.s !== trump.s || !deck.length; });
+  return opts.length ? [opts[0]] : null;
+}
+
+/* Главный цикл игры */
+function tick() {
+  if (over) return;
+  wait = false;
+  if (undefIdx() >= 0 && !taking) {
+    if (dfn === 0) { render(); return; }
+    botDefend();
+    return;
+  }
+  var list = throwers().filter(function (i) { return !passed[i]; });
+  for (var n = 0; n < list.length; n++) {
+    var i = list[n];
+    if (i === 0) {
+      var can = !table.length || hands[0].some(function (c) { return validThrow([c]); });
+      if (can) { wait = true; render(); return; }
+      passed[0] = 1;
+      continue;
+    }
+    var p = botThrow(i);
+    if (p) {
+      p.forEach(function (c) { removeCard(i, c); table.push({ a: c }); });
+      passed = {};
+      render();
+      sched(800);
+      return;
+    }
+    passed[i] = 1;
+  }
+  if (taking) endTake();
+  else if (allDefended()) endBito();
+  else render();
+}
+
+/* Кнопка действия */
+function act() {
+  if (over || !hands) return;
+  if (dfn === 0) {
+    if (!taking && undefIdx() >= 0) { taking = true; sel = []; runNow(); }
+    return;
+  }
+  if (!wait) return;
+  if (sel.length) {
+    if (!validThrow(sel)) return;
+    sel.forEach(function (c) { removeCard(0, c); table.push({ a: c }); });
+    sel = []; passed = {}; wait = false;
+    render();
+    sched(800);
+  } else if (table.length) {
+    passed[0] = 1;
+    runNow();
+  }
+}
+
+function playable(c) {
+  if (over) return false;
+  if (dfn === 0) {
+    if (taking || undefIdx() < 0) return false;
+    var t = (tgt >= 0 && !table[tgt].d) ? tgt : undefIdx();
+    return beats(c, table[t].a) || xferable(0).indexOf(c) >= 0;
+  }
+  return wait && validThrow([c]);
+}
+
+function render() {
+  hands[0].sort(function (a, b) { return a.s - b.s || a.r - b.r; });
+  var ops = '';
+  hands.forEach(function (h, i) {
+    if (!i) return;
+    ops += '<div class="op' + (i === att ? ' a' : '') + (i === dfn ? ' d' : '') + '">' +
+      name(i) + (i === att ? ' ⚔' : '') + (i === dfn ? ' 🛡' : '') + '<br>' +
+      (h.length ? h.length + ' карт' : 'вышел') + '</div>';
+  });
+  $('ops').innerHTML = ops;
+  $('dk').innerHTML = (deck.length ? cardHTML(trump, 'tr') + '<div class="c back"></div>' : '') +
+    '<div>Козырь ' + SUITS[trump.s] + '<br>в колоде: ' + deck.length + '</div>';
+
+  var tb = '';
+  table.forEach(function (t, i) {
+    tb += '<div class="pr' + (i === tgt ? ' sel' : '') + '" data-t="' + i + '">' +
+      cardHTML(t.a) + (t.d ? cardHTML(t.d, 'd') : '') + '</div>';
+  });
+  $('tb').innerHTML = tb;
+
+  var hd = '';
+  hands[0].forEach(function (c, i) {
+    var cls = sel.indexOf(c) >= 0 ? 'pick' : (playable(c) ? 'ok' : '');
+    hd += '<div data-i="' + i + '" style="display:contents">' + cardHTML(c, cls) + '</div>';
+  });
+  $('hand').innerHTML = hd;
+
+  var st = 'Играют соперники…', bt = '…', en = false;
+  if (!hands[0].length && !over) {
+    st = 'Вы вышли из игры';
+  } else if (dfn === 0) {
+    bt = 'Взять';
+    en = !taking && undefIdx() >= 0;
+    st = taking ? 'Вы берёте карты' : (undefIdx() >= 0 ? 'Отбейтесь, переведите или возьмите' : 'Ждите…');
+  } else if (wait) {
+    bt = sel.length ? 'Ходить' : (taking ? 'Готово' : (allDefended() ? 'Бито' : 'Пас'));
+    en = sel.length ? validThrow(sel) : table.length > 0;
+    st = table.length ? 'Подкиньте карты или завершите' : 'Ваш ход: выберите карты';
+  }
+  $('st').textContent = st;
+  $('bt').textContent = bt;
+  $('bt').disabled = !en || over;
+  $('ov').hidden = !over;
+  $('ovt').textContent = msg;
+}
+
+/* Настройки: число игроков зависит от колоды */
+function fillPlayers() {
+  var mx = Math.min(6, Math.floor((+$('sz').value - 1) / 6));
+  var cur = Math.min(+$('np').value || 2, mx);
+  var html = '';
+  for (var n = 2; n <= mx; n++) html += '<option' + (n === cur ? ' selected' : '') + '>' + n + '</option>';
+  $('np').innerHTML = html;
+}
+
+function init() {
+  $('hand').addEventListener('click', function (e) {
+    var node = e.target.closest('[data-i]');
+    if (!node || over || !hands) return;
+    var c = hands[0][+node.getAttribute('data-i')];
+    if (!c) return;
+    if (dfn === 0) {
+      if (taking || undefIdx() < 0) return;
+      var t = (tgt >= 0 && !table[tgt].d) ? tgt : undefIdx();
+      if (beats(c, table[t].a)) {
+        table[t].d = c;
+        removeCard(0, c);
+        tgt = -1;
+        render();
+        sched(600);
+      } else if (xferable(0).indexOf(c) >= 0) {
+        doXfer(0, c);
+      }
+      return;
+    }
+    if (!wait) return;
+    var k = sel.indexOf(c);
+    if (k >= 0) sel.splice(k, 1); else sel.push(c);
+    render();
+  });
+  $('tb').addEventListener('click', function (e) {
+    var node = e.target.closest('.pr');
+    if (!node || !table) return;
+    var i = +node.getAttribute('data-t');
+    if (table[i] && !table[i].d) { tgt = i; render(); }
+  });
+  $('sz').addEventListener('change', fillPlayers);
+  fillPlayers();
+  $('go').addEventListener('click', function () {
+    settings = {
+      n: +$('np').value,
+      size: +$('sz').value,
+      perevod: $('md').value === '1',
+      all: $('th').value === '1'
+    };
+    $('cf').hidden = true;
+    startGame();
+  });
+  $('gear').addEventListener('click', function () { $('cf').hidden = false; });
+  $('cfg').addEventListener('click', function () { $('ov').hidden = true; $('cf').hidden = false; });
+  $('again').addEventListener('click', startGame);
+  $('bt').addEventListener('click', act);
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
+
+})();
+</script>
+</body>
+</html>
